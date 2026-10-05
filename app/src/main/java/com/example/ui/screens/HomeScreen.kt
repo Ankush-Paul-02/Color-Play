@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -65,102 +66,168 @@ fun HomeScreen(
     onOpenTrophies: () -> Unit,
     onParentalControlsClick: () -> Unit
 ) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag("home_screen_scroll"),
-        contentPadding = PaddingValues(bottom = 32.dp)
-    ) {
-        // Hero Card
-        item {
-            HeroWelcomeBanner(
-                totalStars = totalStars,
-                onFreeDraw = { onStartColoring("free_draw", null) },
-                onPlayGames = onOpenGamesHub
-            )
-        }
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isTablet = maxWidth >= 720.dp
 
-        // Coloring Templates Section
-        item {
-            SectionHeader(
-                title = "🎨 Choose a Coloring Page",
-                subtitle = "Pick your favorite friend to color!",
-                actionLabel = "All Pages",
-                onAction = { onStartColoring("rooster", null) }
-            )
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag("home_screen_scroll"),
+            contentPadding = PaddingValues(bottom = 32.dp)
+        ) {
+            // Hero Card
+            item {
+                HeroWelcomeBanner(
+                    totalStars = totalStars,
+                    onFreeDraw = { onStartColoring("free_draw", null) },
+                    onPlayGames = onOpenGamesHub
+                )
+            }
 
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                modifier = Modifier.padding(top = 8.dp, bottom = 12.dp)
-            ) {
-                items(TemplateRegistry.templates) { template ->
-                    ColoringTemplateCard(
-                        emoji = template.emoji,
-                        title = template.name,
-                        category = template.category,
-                        difficulty = template.difficulty,
-                        testTag = "template_card_${template.id}",
-                        onClick = { onStartColoring(template.id, null) }
-                    )
+            // Coloring Templates Section
+            item {
+                SectionHeader(
+                    title = "🎨 Choose a Coloring Page",
+                    subtitle = "Pick your favorite friend to color!",
+                    actionLabel = "All Pages",
+                    onAction = { onStartColoring("rooster", null) }
+                )
+
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.padding(top = 8.dp, bottom = 12.dp)
+                ) {
+                    items(TemplateRegistry.templates) { template ->
+                        ColoringTemplateCard(
+                            emoji = template.emoji,
+                            title = template.name,
+                            category = template.category,
+                            difficulty = template.difficulty,
+                            testTag = "template_card_${template.id}",
+                            onClick = { onStartColoring(template.id, null) }
+                        )
+                    }
                 }
             }
-        }
 
-        // Educational Games Section
-        item {
-            SectionHeader(
-                title = "🎮 Educational Games",
-                subtitle = "Play, count, learn shapes & letters!",
-                actionLabel = "Games Hub",
-                onAction = onOpenGamesHub
-            )
-
-            Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                EducationalGameItem(
-                    emoji = "🎈",
-                    title = "Color Pop & Match",
-                    subtitle = "Pop floating colored balloons and learn color names!",
-                    badge = "Colors",
-                    backgroundColor = Color(0xFFFF5252),
-                    testTag = "game_item_color_match",
-                    onClick = { onOpenGame(Screen.ColorMatch) }
+            // Educational Games Section (Responsive Grid for tablets)
+            item {
+                SectionHeader(
+                    title = "🎮 Educational Games",
+                    subtitle = "Play, count, learn shapes & letters!",
+                    actionLabel = "Games Hub",
+                    onAction = onOpenGamesHub
                 )
 
-                EducationalGameItem(
-                    emoji = "🔢",
-                    title = "Number Paint & Count",
-                    subtitle = "Match numbers 1 to 5 to reveal hidden animals!",
-                    badge = "Counting",
-                    backgroundColor = Color(0xFFFF9F1A),
-                    testTag = "game_item_number_color",
-                    onClick = { onOpenGame(Screen.NumberColor) }
-                )
+                if (isTablet) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                EducationalGameItem(
+                                    emoji = "🎈",
+                                    title = "Color Pop & Match",
+                                    subtitle = "Pop floating colored balloons and learn color names!",
+                                    badge = "Colors",
+                                    backgroundColor = Color(0xFFFF5252),
+                                    testTag = "game_item_color_match",
+                                    onClick = { onOpenGame(Screen.ColorMatch) }
+                                )
+                            }
+                            Box(modifier = Modifier.weight(1f)) {
+                                EducationalGameItem(
+                                    emoji = "🔢",
+                                    title = "Number Paint & Count",
+                                    subtitle = "Match numbers 1 to 5 to reveal hidden animals!",
+                                    badge = "Counting",
+                                    backgroundColor = Color(0xFFFF9F1A),
+                                    testTag = "game_item_number_color",
+                                    onClick = { onOpenGame(Screen.NumberColor) }
+                                )
+                            }
+                        }
 
-                EducationalGameItem(
-                    emoji = "⭐",
-                    title = "Shape Detective",
-                    subtitle = "Fit circles, stars, squares into funny shapes!",
-                    badge = "Geometry",
-                    backgroundColor = Color(0xFF2ED573),
-                    testTag = "game_item_shape_game",
-                    onClick = { onOpenGame(Screen.ShapeDetective) }
-                )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                EducationalGameItem(
+                                    emoji = "⭐",
+                                    title = "Shape Detective",
+                                    subtitle = "Fit circles, stars, squares into funny shapes!",
+                                    badge = "Geometry",
+                                    backgroundColor = Color(0xFF2ED573),
+                                    testTag = "game_item_shape_game",
+                                    onClick = { onOpenGame(Screen.ShapeDetective) }
+                                )
+                            }
+                            Box(modifier = Modifier.weight(1f)) {
+                                EducationalGameItem(
+                                    emoji = "🔤",
+                                    title = "ABC Phonics & Animal Tracing",
+                                    subtitle = "Trace alphabet letters and meet animal friends!",
+                                    badge = "Alphabet",
+                                    backgroundColor = Color(0xFF1E90FF),
+                                    testTag = "game_item_alphabet_game",
+                                    onClick = { onOpenGame(Screen.AlphabetColor) }
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        EducationalGameItem(
+                            emoji = "🎈",
+                            title = "Color Pop & Match",
+                            subtitle = "Pop floating colored balloons and learn color names!",
+                            badge = "Colors",
+                            backgroundColor = Color(0xFFFF5252),
+                            testTag = "game_item_color_match",
+                            onClick = { onOpenGame(Screen.ColorMatch) }
+                        )
 
-                EducationalGameItem(
-                    emoji = "🔤",
-                    title = "ABC Phonics & Animal Tracing",
-                    subtitle = "Trace alphabet letters and meet animal friends!",
-                    badge = "Alphabet",
-                    backgroundColor = Color(0xFF1E90FF),
-                    testTag = "game_item_alphabet_game",
-                    onClick = { onOpenGame(Screen.AlphabetColor) }
-                )
+                        EducationalGameItem(
+                            emoji = "🔢",
+                            title = "Number Paint & Count",
+                            subtitle = "Match numbers 1 to 5 to reveal hidden animals!",
+                            badge = "Counting",
+                            backgroundColor = Color(0xFFFF9F1A),
+                            testTag = "game_item_number_color",
+                            onClick = { onOpenGame(Screen.NumberColor) }
+                        )
+
+                        EducationalGameItem(
+                            emoji = "⭐",
+                            title = "Shape Detective",
+                            subtitle = "Fit circles, stars, squares into funny shapes!",
+                            badge = "Geometry",
+                            backgroundColor = Color(0xFF2ED573),
+                            testTag = "game_item_shape_game",
+                            onClick = { onOpenGame(Screen.ShapeDetective) }
+                        )
+
+                        EducationalGameItem(
+                            emoji = "🔤",
+                            title = "ABC Phonics & Animal Tracing",
+                            subtitle = "Trace alphabet letters and meet animal friends!",
+                            badge = "Alphabet",
+                            backgroundColor = Color(0xFF1E90FF),
+                            testTag = "game_item_alphabet_game",
+                            onClick = { onOpenGame(Screen.AlphabetColor) }
+                        )
+                    }
+                }
             }
-        }
 
         // Recent Saved Masterpieces Section (Offline Gallery)
         item {
@@ -278,6 +345,7 @@ fun HomeScreen(
                 }
             }
         }
+    }
     }
 }
 

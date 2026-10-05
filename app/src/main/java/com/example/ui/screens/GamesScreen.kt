@@ -933,18 +933,31 @@ fun AlphabetColorGameScreen(
                     .fillMaxSize()
                     .pointerInput(item.letter) {
                         detectDragGestures(
+                            onDragStart = { offset ->
+                                drawnPoints.add(StrokePoint(offset.x, offset.y))
+                            },
                             onDrag = { change, _ ->
+                                change.consume()
                                 drawnPoints.add(StrokePoint(change.position.x, change.position.y))
                             }
                         )
                     }
             ) {
-                if (drawnPoints.size > 1) {
+                if (drawnPoints.size == 1) {
+                    drawCircle(
+                        color = Color(item.strokeColor),
+                        radius = 12f,
+                        center = Offset(drawnPoints.first().x, drawnPoints.first().y)
+                    )
+                } else if (drawnPoints.size > 1) {
                     val path = Path().apply {
                         moveTo(drawnPoints.first().x, drawnPoints.first().y)
                         for (i in 1 until drawnPoints.size) {
-                            lineTo(drawnPoints[i].x, drawnPoints[i].y)
+                            val prev = drawnPoints[i - 1]
+                            val curr = drawnPoints[i]
+                            quadraticTo(prev.x, prev.y, (prev.x + curr.x) / 2f, (prev.y + curr.y) / 2f)
                         }
+                        lineTo(drawnPoints.last().x, drawnPoints.last().y)
                     }
                     drawPath(
                         path = path,

@@ -31,11 +31,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.EmojiEmotions
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AlertDialog
@@ -43,13 +44,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -68,9 +67,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -92,7 +89,6 @@ import com.example.model.StrokePoint
 import com.example.model.TemplateRegistry
 import com.example.ui.components.ConfettiEffect
 import com.example.ui.theme.DrawingColors
-import kotlin.random.Random
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,6 +98,7 @@ fun ColoringScreen(
     drawingId: Long?,
     onSaveDrawing: (title: String) -> Unit,
     onBack: () -> Unit,
+    onCanvasUpdated: (DrawingCanvasData) -> Unit = {},
     onPlaySoundPop: () -> Unit = {},
     onPlayBrushSound: () -> Unit = {}
 ) {
@@ -116,20 +113,28 @@ fun ColoringScreen(
     val stamps = remember { mutableStateListOf<PlacedStamp>().apply { addAll(initialCanvasData.stamps) } }
     val undoneStamps = remember { mutableStateListOf<PlacedStamp>() }
 
-    // Selected drawing tool properties
+    // Tool state
     var selectedColor by remember { mutableLongStateOf(0xFFFF3838) }
     var selectedBrushMode by remember { mutableStateOf(BrushMode.MARKER) }
     var strokeWidth by remember { mutableFloatStateOf(24f) }
+    var isEraserActive by remember { mutableStateOf(false) }
+    var eraserWidth by remember { mutableFloatStateOf(44f) }
+
     var selectedStampType by remember { mutableStateOf(StampType.STAR) }
     var showStampPicker by remember { mutableStateOf(false) }
 
     // Save Dialog State
     var showSaveDialog by remember { mutableStateOf(false) }
+    var showClearConfirmDialog by remember { mutableStateOf(false) }
     var drawingTitle by remember { mutableStateOf(template.defaultTitle) }
     var showCelebration by remember { mutableStateOf(false) }
 
-    // Current in-progress stroke
+    // Current in-progress stroke with accurate coordinate tracking
     var currentStrokePoints by remember { mutableStateOf<List<StrokePoint>?>(null) }
+
+    fun notifyUpdate() {
+        onCanvasUpdated(DrawingCanvasData(paths.toList(), stamps.toList(), templateId))
+    }
 
     Column(
         modifier = Modifier
@@ -140,14 +145,24 @@ fun ColoringScreen(
         TopAppBar(
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = template.emoji, fontSize = 22.sp)
+                    Text(text = template.emoji, fontSize = 24.sp)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = template.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1
-                    )
+                    Column {
+                        Text(
+                            text = template.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                        if (isEraserActive) {
+                            Text(
+                                text = "🧽 Eraser Mode Active",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFFFF5252),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             },
             navigationIcon = {
@@ -168,10 +183,12 @@ fun ColoringScreen(
                         if (paths.isNotEmpty()) {
                             val removed = paths.removeAt(paths.lastIndex)
                             undonePaths.add(removed)
+                            notifyUpdate()
                             onPlaySoundPop()
                         } else if (stamps.isNotEmpty()) {
                             val removed = stamps.removeAt(stamps.lastIndex)
                             undoneStamps.add(removed)
+                            notifyUpdate()
                             onPlaySoundPop()
                         }
                     },
@@ -190,10 +207,12 @@ fun ColoringScreen(
                         if (undonePaths.isNotEmpty()) {
                             val restored = undonePaths.removeAt(undonePaths.lastIndex)
                             paths.add(restored)
+                            notifyUpdate()
                             onPlaySoundPop()
                         } else if (undoneStamps.isNotEmpty()) {
                             val restored = undoneStamps.removeAt(undoneStamps.lastIndex)
                             stamps.add(restored)
+                            notifyUpdate()
                             onPlaySoundPop()
                         }
                     },
@@ -206,20 +225,14 @@ fun ColoringScreen(
                     )
                 }
 
-                // Clear Canvas
+                // Clear All Button
                 IconButton(
-                    onClick = {
-                        paths.clear()
-                        stamps.clear()
-                        undonePaths.clear()
-                        undoneStamps.clear()
-                        onPlaySoundPop()
-                    },
+                    onClick = { showClearConfirmDialog = true },
                     modifier = Modifier.testTag("clear_canvas_button")
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
-                        contentDescription = "Clear",
+                        contentDescription = "Clear All",
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
@@ -247,7 +260,7 @@ fun ColoringScreen(
             )
         )
 
-        // The Interactive Drawing Canvas
+        // The Interactive Drawing Canvas with Accurately Tracked Touch Gestures
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -255,14 +268,14 @@ fun ColoringScreen(
                 .padding(horizontal = 12.dp, vertical = 6.dp)
                 .clip(RoundedCornerShape(24.dp))
                 .background(Color.White)
-                .border(2.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(24.dp))
+                .border(2.5.dp, if (isEraserActive) Color(0xFFFF5252).copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(24.dp))
                 .testTag("coloring_drawing_canvas")
         ) {
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(selectedBrushMode, selectedColor, strokeWidth, showStampPicker, selectedStampType) {
-                        if (showStampPicker) {
+                    .pointerInput(isEraserActive, selectedBrushMode, selectedColor, strokeWidth, eraserWidth, showStampPicker, selectedStampType) {
+                        if (showStampPicker && !isEraserActive) {
                             // Tap to place stamp
                             detectTapGestures { offset ->
                                 stamps.add(
@@ -275,31 +288,71 @@ fun ColoringScreen(
                                     )
                                 )
                                 undoneStamps.clear()
+                                notifyUpdate()
                                 onPlaySoundPop()
                             }
                         } else {
-                            // Touch drawing drag
+                            // Touch drawing and eraser drag with precision tracking
                             detectDragGestures(
                                 onDragStart = { offset ->
-                                    currentStrokePoints = listOf(StrokePoint(offset.x, offset.y))
-                                    onPlayBrushSound()
+                                    val startPoint = StrokePoint(offset.x, offset.y)
+                                    currentStrokePoints = listOf(startPoint)
+
+                                    if (isEraserActive) {
+                                        // If tap on a stamp, erase the stamp immediately!
+                                        val radiusSq = (eraserWidth * 1.5f) * (eraserWidth * 1.5f)
+                                        val idx = stamps.indexOfLast { st ->
+                                            val dx = st.x - offset.x
+                                            val dy = st.y - offset.y
+                                            (dx * dx + dy * dy) <= radiusSq
+                                        }
+                                        if (idx >= 0) {
+                                            stamps.removeAt(idx)
+                                            notifyUpdate()
+                                        }
+                                        onPlaySoundPop()
+                                    } else {
+                                        onPlayBrushSound()
+                                    }
                                 },
                                 onDrag = { change, _ ->
+                                    change.consume()
                                     val current = currentStrokePoints ?: emptyList()
-                                    currentStrokePoints = current + StrokePoint(change.position.x, change.position.y)
+                                    val newPt = StrokePoint(change.position.x, change.position.y)
+                                    currentStrokePoints = current + newPt
+
+                                    if (isEraserActive) {
+                                        // Erase any stamp that touches eraser path
+                                        val radiusSq = (eraserWidth * 1.4f) * (eraserWidth * 1.4f)
+                                        val idx = stamps.indexOfLast { st ->
+                                            val dx = st.x - change.position.x
+                                            val dy = st.y - change.position.y
+                                            (dx * dx + dy * dy) <= radiusSq
+                                        }
+                                        if (idx >= 0) {
+                                            stamps.removeAt(idx)
+                                            notifyUpdate()
+                                            onPlaySoundPop()
+                                        }
+                                    }
                                 },
                                 onDragEnd = {
                                     val finishedPoints = currentStrokePoints
                                     if (!finishedPoints.isNullOrEmpty()) {
+                                        val effectiveWidth = if (isEraserActive) eraserWidth else strokeWidth
+                                        val effectiveColor = if (isEraserActive) 0xFFFFFFFF else selectedColor
+                                        val effectiveMode = if (isEraserActive) BrushMode.ERASER else selectedBrushMode
+
                                         paths.add(
                                             DrawingPath(
                                                 points = finishedPoints,
-                                                color = if (selectedBrushMode == BrushMode.ERASER) 0xFFFFFFFF else selectedColor,
-                                                strokeWidth = strokeWidth,
-                                                brushMode = selectedBrushMode
+                                                color = effectiveColor,
+                                                strokeWidth = effectiveWidth,
+                                                brushMode = effectiveMode
                                             )
                                         )
                                         undonePaths.clear()
+                                        notifyUpdate()
                                     }
                                     currentStrokePoints = null
                                 },
@@ -313,20 +366,32 @@ fun ColoringScreen(
                 val canvasW = size.width
                 val canvasH = size.height
 
-                // 1. Draw existing user stroke paths
+                // 1. Draw existing user stroke paths with smooth Bezier curves
                 for (p in paths) {
-                    if (p.points.size > 1) {
+                    if (p.points.size == 1) {
+                        // Accurately render single-tap dots!
+                        val pt = p.points.first()
+                        val col = if (p.brushMode == BrushMode.ERASER) Color.White else Color(p.color)
+                        drawCircle(
+                            color = col,
+                            radius = (p.strokeWidth / 2f).coerceAtLeast(3f),
+                            center = Offset(pt.x, pt.y)
+                        )
+                    } else if (p.points.size > 1) {
                         val path = Path().apply {
                             moveTo(p.points.first().x, p.points.first().y)
                             for (i in 1 until p.points.size) {
-                                lineTo(p.points[i].x, p.points[i].y)
+                                val prev = p.points[i - 1]
+                                val curr = p.points[i]
+                                quadraticTo(prev.x, prev.y, (prev.x + curr.x) / 2f, (prev.y + curr.y) / 2f)
                             }
+                            lineTo(p.points.last().x, p.points.last().y)
                         }
 
                         when (p.brushMode) {
                             BrushMode.RAINBOW -> {
                                 val rainbowBrush = Brush.linearGradient(
-                                    listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Magenta),
+                                    listOf(Color(0xFFFF3838), Color(0xFFFFD32A), Color(0xFF2ED573), Color(0xFF1E90FF), Color(0xFF9B59B6)),
                                     start = Offset(0f, 0f),
                                     end = Offset(canvasW, canvasH)
                                 )
@@ -337,13 +402,11 @@ fun ColoringScreen(
                                 )
                             }
                             BrushMode.NEON -> {
-                                // Outer glow
                                 drawPath(
                                     path = path,
                                     color = Color(p.color).copy(alpha = 0.35f),
                                     style = Stroke(width = p.strokeWidth * 1.8f, cap = StrokeCap.Round, join = StrokeJoin.Round)
                                 )
-                                // Inner bright line
                                 drawPath(
                                     path = path,
                                     color = Color(p.color),
@@ -356,25 +419,24 @@ fun ColoringScreen(
                                     color = Color(p.color),
                                     style = Stroke(width = p.strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
                                 )
-                                // Draw cute glitter sparkles along the points
-                                for (i in p.points.indices step 6) {
+                                for (i in p.points.indices step 5) {
                                     val pt = p.points[i]
                                     drawCircle(
                                         color = Color.White,
-                                        radius = (p.strokeWidth * 0.28f).coerceAtLeast(3f),
+                                        radius = (p.strokeWidth * 0.28f).coerceAtLeast(3.5f),
                                         center = Offset(pt.x + (i % 5 - 2) * 4, pt.y + (i % 7 - 3) * 4)
                                     )
                                 }
                             }
                             BrushMode.ERASER -> {
+                                // Smooth white eraser wipe
                                 drawPath(
                                     path = path,
                                     color = Color.White,
-                                    style = Stroke(width = p.strokeWidth * 1.5f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                                    style = Stroke(width = p.strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
                                 )
                             }
                             else -> {
-                                // MARKER & PENCIL
                                 drawPath(
                                     path = path,
                                     color = Color(p.color),
@@ -385,32 +447,61 @@ fun ColoringScreen(
                     }
                 }
 
-                // 2. Draw current active stroke
+                // 2. Draw current in-progress live stroke & live eraser cursor
                 val activePts = currentStrokePoints
-                if (activePts != null && activePts.size > 1) {
-                    val activePath = Path().apply {
-                        moveTo(activePts.first().x, activePts.first().y)
-                        for (i in 1 until activePts.size) {
-                            lineTo(activePts[i].x, activePts[i].y)
+                if (!activePts.isNullOrEmpty()) {
+                    val activeWidth = if (isEraserActive) eraserWidth else strokeWidth
+                    val activeColor = if (isEraserActive) Color.White else Color(selectedColor)
+
+                    if (activePts.size == 1) {
+                        drawCircle(
+                            color = activeColor,
+                            radius = (activeWidth / 2f).coerceAtLeast(3f),
+                            center = Offset(activePts.first().x, activePts.first().y)
+                        )
+                    } else {
+                        val activePath = Path().apply {
+                            moveTo(activePts.first().x, activePts.first().y)
+                            for (i in 1 until activePts.size) {
+                                val prev = activePts[i - 1]
+                                val curr = activePts[i]
+                                quadraticTo(prev.x, prev.y, (prev.x + curr.x) / 2f, (prev.y + curr.y) / 2f)
+                            }
+                            lineTo(activePts.last().x, activePts.last().y)
                         }
+
+                        drawPath(
+                            path = activePath,
+                            color = activeColor,
+                            style = Stroke(width = activeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                        )
                     }
-                    val strokeColor = if (selectedBrushMode == BrushMode.ERASER) Color.White else Color(selectedColor)
-                    drawPath(
-                        path = activePath,
-                        color = strokeColor,
-                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
-                    )
+
+                    // Live tactile cursor under finger:
+                    val lastPt = activePts.last()
+                    if (isEraserActive) {
+                        // Prominent pink/coral ring showing exact eraser wipe zone
+                        drawCircle(
+                            color = Color(0xFFFF5252).copy(alpha = 0.5f),
+                            radius = activeWidth / 2f,
+                            center = Offset(lastPt.x, lastPt.y),
+                            style = Stroke(width = 3f)
+                        )
+                        drawCircle(
+                            color = Color(0xFFFF5252).copy(alpha = 0.15f),
+                            radius = activeWidth / 2f,
+                            center = Offset(lastPt.x, lastPt.y)
+                        )
+                    }
                 }
 
-                // 3. Draw placed stamps
+                // 3. Draw placed stickers & stamps
                 for (st in stamps) {
                     drawCircle(
                         color = Color(st.color).copy(alpha = 0.25f),
                         radius = st.size * 0.8f,
                         center = Offset(st.x, st.y)
                     )
-                    // Draw stamp emoji representation
-                    // We render a neat circle or star shape
                     drawCircle(
                         color = Color(st.color),
                         radius = st.size * 0.45f,
@@ -418,7 +509,7 @@ fun ColoringScreen(
                     )
                 }
 
-                // 4. Draw template outline on top so lines stay crisp and visible!
+                // 4. Draw template outline on top so boundaries remain crisp and clear!
                 if (templateId != "free_draw") {
                     TemplateRegistry.drawTemplateOutline(this, templateId, Color(0xFF2D3436))
                 }
@@ -432,73 +523,173 @@ fun ColoringScreen(
             }
         }
 
-        // Bottom Controls Container
+        // Bottom Controls Container with Prominent Eraser & Color Picker
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 8.dp
+            shadowElevation = 10.dp
         ) {
             Column(
                 modifier = Modifier.padding(vertical = 10.dp)
             ) {
-                // Color Swatches Row
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.padding(bottom = 8.dp)
-                ) {
-                    items(DrawingColors) { color ->
-                        val colorHex = color.toArgb().toLong() and 0xFFFFFFFF
-                        val isSelected = selectedColor == colorHex && selectedBrushMode != BrushMode.ERASER
-
-                        Box(
-                            modifier = Modifier
-                                .size(if (isSelected) 46.dp else 40.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                                .border(
-                                    width = if (isSelected) 3.5.dp else 1.5.dp,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.LightGray,
-                                    shape = CircleShape
-                                )
-                                .clickable {
-                                    selectedColor = colorHex
-                                    if (selectedBrushMode == BrushMode.ERASER) {
-                                        selectedBrushMode = BrushMode.MARKER
-                                    }
-                                    showStampPicker = false
-                                    onPlaySoundPop()
+                // Row 1: Active Mode Header & Contextual Controls
+                if (isEraserActive) {
+                    // Eraser Active Banner with Eraser Sizes
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFFFF5252).copy(alpha = 0.15f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(text = "🧽", fontSize = 18.sp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Eraser Active",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = Color(0xFFFF5252)
+                                    )
                                 }
-                                .testTag("color_swatch_${color.toArgb()}"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (isSelected) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "Selected",
-                                    tint = if (color == Color.White) Color.Black else Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Wipe to erase paint & stickers",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        // Eraser Sizes: S / M / L
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf(24f to "S", 44f to "M", 74f to "L").forEach { (size, label) ->
+                                val isSel = eraserWidth == size
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (isSel) Color(0xFFFF5252) else MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                        .clickable {
+                                            eraserWidth = size
+                                            onPlaySoundPop()
+                                        }
+                                        .testTag("eraser_size_$label"),
+                                    shadowElevation = if (isSel) 3.dp else 0.dp
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = label,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            color = if (isSel) Color.White else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Regular Color Swatches Row
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    ) {
+                        items(DrawingColors) { color ->
+                            val colorHex = color.toArgb().toLong() and 0xFFFFFFFF
+                            val isSelected = selectedColor == colorHex && !isEraserActive
+
+                            Box(
+                                modifier = Modifier
+                                    .size(if (isSelected) 46.dp else 40.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .border(
+                                        width = if (isSelected) 3.5.dp else 1.5.dp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.LightGray,
+                                        shape = CircleShape
+                                    )
+                                    .clickable {
+                                        selectedColor = colorHex
+                                        isEraserActive = false
+                                        showStampPicker = false
+                                        onPlaySoundPop()
+                                    }
+                                    .testTag("color_swatch_${color.toArgb()}"),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Selected",
+                                        tint = if (color == Color.White) Color.Black else Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
                     }
                 }
 
-                // Tool selection & Brush size Row
+                // Row 2: Dedicated Eraser Button, Brush Tools & Sizes
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp),
+                        .padding(horizontal = 14.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Brush mode options
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // Left Group: Tools + Dedicated Prominent ERASER
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // 1. DEDICATED PROMINENT ERASER BUTTON
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isEraserActive) Color(0xFFFF5252) else MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable {
+                                    isEraserActive = !isEraserActive
+                                    showStampPicker = false
+                                    onPlaySoundPop()
+                                }
+                                .testTag("tool_button_Eraser"),
+                            shadowElevation = if (isEraserActive) 4.dp else 1.dp
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = "🧽", fontSize = 18.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Eraser",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = if (isEraserActive) Color.White else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+
+                        // 2. Brush mode chips
                         ToolIconButton(
                             label = "Marker",
                             icon = "🖌️",
-                            selected = selectedBrushMode == BrushMode.MARKER && !showStampPicker,
+                            selected = !isEraserActive && selectedBrushMode == BrushMode.MARKER && !showStampPicker,
                             onClick = {
+                                isEraserActive = false
                                 selectedBrushMode = BrushMode.MARKER
                                 showStampPicker = false
                                 onPlaySoundPop()
@@ -508,8 +699,9 @@ fun ColoringScreen(
                         ToolIconButton(
                             label = "Neon",
                             icon = "✨",
-                            selected = selectedBrushMode == BrushMode.NEON && !showStampPicker,
+                            selected = !isEraserActive && selectedBrushMode == BrushMode.NEON && !showStampPicker,
                             onClick = {
+                                isEraserActive = false
                                 selectedBrushMode = BrushMode.NEON
                                 showStampPicker = false
                                 onPlaySoundPop()
@@ -519,20 +711,10 @@ fun ColoringScreen(
                         ToolIconButton(
                             label = "Rainbow",
                             icon = "🌈",
-                            selected = selectedBrushMode == BrushMode.RAINBOW && !showStampPicker,
+                            selected = !isEraserActive && selectedBrushMode == BrushMode.RAINBOW && !showStampPicker,
                             onClick = {
+                                isEraserActive = false
                                 selectedBrushMode = BrushMode.RAINBOW
-                                showStampPicker = false
-                                onPlaySoundPop()
-                            }
-                        )
-
-                        ToolIconButton(
-                            label = "Glitter",
-                            icon = "🌟",
-                            selected = selectedBrushMode == BrushMode.GLITTER && !showStampPicker,
-                            onClick = {
-                                selectedBrushMode = BrushMode.GLITTER
                                 showStampPicker = false
                                 onPlaySoundPop()
                             }
@@ -541,62 +723,54 @@ fun ColoringScreen(
                         ToolIconButton(
                             label = "Stamps",
                             icon = selectedStampType.symbol,
-                            selected = showStampPicker,
+                            selected = !isEraserActive && showStampPicker,
                             onClick = {
+                                isEraserActive = false
                                 showStampPicker = !showStampPicker
-                                onPlaySoundPop()
-                            }
-                        )
-
-                        ToolIconButton(
-                            label = "Eraser",
-                            icon = "🧽",
-                            selected = selectedBrushMode == BrushMode.ERASER && !showStampPicker,
-                            onClick = {
-                                selectedBrushMode = BrushMode.ERASER
-                                showStampPicker = false
                                 onPlaySoundPop()
                             }
                         )
                     }
 
-                    // Stroke Width selector (Thin / Med / Thick)
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        listOf(12f to "S", 24f to "M", 42f to "L").forEach { (width, label) ->
-                            val isChosen = strokeWidth == width
-                            Surface(
-                                shape = CircleShape,
-                                color = if (isChosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .clickable {
-                                        strokeWidth = width
-                                        onPlaySoundPop()
+                    // Right Group: Brush size selector (when not eraser)
+                    if (!isEraserActive) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf(12f to "S", 24f to "M", 44f to "L").forEach { (width, label) ->
+                                val isChosen = strokeWidth == width
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (isChosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .clickable {
+                                            strokeWidth = width
+                                            onPlaySoundPop()
+                                        }
+                                        .testTag("stroke_width_$label"),
+                                    shadowElevation = if (isChosen) 2.dp else 0.dp
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = label,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            color = if (isChosen) Color.White else MaterialTheme.colorScheme.onSurface
+                                        )
                                     }
-                                    .testTag("stroke_width_$label"),
-                                shadowElevation = if (isChosen) 2.dp else 0.dp
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text(
-                                        text = label,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp,
-                                        color = if (isChosen) Color.White else MaterialTheme.colorScheme.onSurface
-                                    )
                                 }
                             }
                         }
                     }
                 }
 
-                // Stamp picker row if stamps enabled
-                AnimatedVisibility(visible = showStampPicker) {
+                // Row 3: Stamp Picker if opened
+                AnimatedVisibility(visible = showStampPicker && !isEraserActive) {
                     LazyRow(
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         items(StampType.entries) { stamp ->
@@ -645,7 +819,7 @@ fun ColoringScreen(
             text = {
                 Column {
                     Text(
-                        text = "Give your artwork a special name so you can find it anytime in your gallery:",
+                        text = "Give your artwork a special name to find it in your offline gallery:",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Spacer(modifier = Modifier.height(14.dp))
@@ -685,6 +859,42 @@ fun ColoringScreen(
             shape = RoundedCornerShape(24.dp)
         )
     }
+
+    // Clear Canvas Confirmation Dialog
+    if (showClearConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirmDialog = false },
+            title = { Text("Clear Canvas? 🧹") },
+            text = { Text("Would you like to erase all paint and stickers to start a fresh drawing?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        paths.clear()
+                        stamps.clear()
+                        undonePaths.clear()
+                        undoneStamps.clear()
+                        notifyUpdate()
+                        onPlaySoundPop()
+                        showClearConfirmDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.testTag("confirm_clear_canvas_button")
+                ) {
+                    Text("Clear All")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showClearConfirmDialog = false },
+                    modifier = Modifier.testTag("cancel_clear_canvas_button")
+                ) {
+                    Text("Keep Canvas")
+                }
+            },
+            shape = RoundedCornerShape(20.dp)
+        )
+    }
 }
 
 @Composable
@@ -704,14 +914,14 @@ private fun ToolIconButton(
         shadowElevation = if (selected) 2.dp else 0.dp
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(text = icon, fontSize = 16.sp)
-            Spacer(modifier = Modifier.width(3.dp))
+            Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = label,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                 color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
             )

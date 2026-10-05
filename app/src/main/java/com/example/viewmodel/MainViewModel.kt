@@ -1,10 +1,12 @@
 package com.example.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.ColorPlayApplication
 import com.example.audio.SoundPlayer
-import com.example.data.AppDatabase
 import com.example.data.AppRepository
 import com.example.data.DrawingEntity
 import com.example.data.GameProgressEntity
@@ -37,10 +39,10 @@ sealed interface Screen {
     data object ParentalControls : Screen
 }
 
-class MainViewModel(application: Application) : AndroidViewModel(application) {
-    private val database = AppDatabase.getInstance(application)
-    val repository = AppRepository(database.appDao())
-    val soundPlayer = SoundPlayer(application)
+class MainViewModel(
+    val repository: AppRepository,
+    val soundPlayer: SoundPlayer
+) : ViewModel() {
 
     // Navigation Stack
     private val _navStack = MutableStateFlow<List<Screen>>(listOf(Screen.Home))
@@ -271,7 +273,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isTimeLocked.value = false
             val current = repository.getParentalSettingsDirect() ?: return@launch
-            val newLimit = current.dailyLimitMinutes + additionalMinutes
+            val currentUsedMins = _todaySecondsPlayed.value / 60
+            val newLimit = maxOf(current.dailyLimitMinutes, currentUsedMins) + additionalMinutes
             repository.saveParentalSettings(current.copy(dailyLimitMinutes = newLimit))
         }
     }
@@ -285,6 +288,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         viewModelScope.launch {
             val current = repository.getParentalSettingsDirect() ?: ParentalSettingsEntity()
+            val currentUsedMins = _todaySecondsPlayed.value / 60
+            if (dailyLimit == 0 || dailyLimit > currentUsedMins) {
+                _isTimeLocked.value = false
+            }
             val updated = current.copy(
                 pinCode = pin,
                 dailyLimitMinutes = dailyLimit,
@@ -297,6 +304,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _themeOverride.value = themeMode
             _eyeCareMode.value = eyeCare
             soundPlayer.playChimeSuccess()
+        }
+    }
+
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val application = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as ColorPlayApplication)
+                MainViewModel(
+                    repository = application.container.repository,
+                    soundPlayer = application.container.soundPlayer
+                )
+            }
         }
     }
 }

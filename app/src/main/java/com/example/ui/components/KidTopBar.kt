@@ -38,6 +38,7 @@ fun KidTopBar(
     title: String,
     subtitle: String? = null,
     showBackButton: Boolean = false,
+    showMenuButton: Boolean = true,
     totalStars: Int = 0,
     onBackClick: () -> Unit = {},
     onOpenDrawer: () -> Unit = {},
@@ -65,7 +66,7 @@ fun KidTopBar(
                         contentDescription = "Back"
                     )
                 }
-            } else {
+            } else if (showMenuButton) {
                 IconButton(
                     onClick = onOpenDrawer,
                     modifier = Modifier.testTag("top_bar_menu_button")

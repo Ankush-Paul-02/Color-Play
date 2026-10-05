@@ -8,8 +8,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
@@ -18,13 +21,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.model.DrawingCanvasData
 import com.example.model.GameType
 import com.example.ui.components.AppDrawerContent
+import com.example.ui.components.AppNavigationRail
 import com.example.ui.components.KidTopBar
 import com.example.ui.components.ParentGateDialog
 import com.example.ui.components.ScreenTimeLockScreen
@@ -48,7 +54,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            val viewModel: MainViewModel = viewModel()
+            // Pure Constructor Injection via ViewModelProvider.Factory
+            val viewModel: MainViewModel = viewModel(factory = MainViewModel.Factory)
             val themeMode by viewModel.themeOverride.collectAsState()
             val eyeCareMode by viewModel.eyeCareMode.collectAsState()
 
@@ -99,68 +106,168 @@ fun ColorPlayApp(viewModel: MainViewModel) {
         scope.launch { drawerState.close() }
     }
 
-    // Modal Navigation Drawer
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            AppDrawerContent(
-                currentScreen = currentScreen,
-                totalStars = totalStars,
-                onNavigate = { screen ->
-                    viewModel.navigateAndClearTo(screen)
-                },
-                onParentalControlsClick = {
-                    viewModel.requestParentAccess {
-                        viewModel.navigateTo(Screen.ParentalControls)
-                    }
-                },
-                onCloseDrawer = {
-                    scope.launch { drawerState.close() }
-                }
-            )
-        },
-        modifier = Modifier.testTag("app_navigation_drawer")
-    ) {
-        val showTopBar = currentScreen !is Screen.Coloring
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isWideScreen = maxWidth >= 720.dp
 
-        Scaffold(
-            topBar = {
-                if (showTopBar) {
-                    val title = when (currentScreen) {
-                        is Screen.Home -> "Color & Play 🎨"
-                        is Screen.GamesHub -> "Games Hub 🎮"
-                        is Screen.ColorMatch -> "Color Match 🎈"
-                        is Screen.NumberColor -> "Number Paint 🔢"
-                        is Screen.ShapeDetective -> "Shape Detective ⭐"
-                        is Screen.AlphabetColor -> "ABC Phonics 🔤"
-                        is Screen.Gallery -> "My Masterpieces 🖼️"
-                        is Screen.TrophyRoom -> "Trophies 🏆"
-                        is Screen.ParentalControls -> "Parental Controls 🛡️"
-                        else -> "Color & Play"
-                    }
-
-                    val isSubScreen = currentScreen !is Screen.Home
-
-                    KidTopBar(
-                        title = title,
-                        showBackButton = isSubScreen,
-                        totalStars = totalStars,
-                        onBackClick = { viewModel.goBack() },
-                        onOpenDrawer = {
-                            scope.launch { drawerState.open() }
-                        },
-                        onStarsClick = {
-                            viewModel.navigateTo(Screen.TrophyRoom)
+        if (isWideScreen) {
+            // Adaptive Tablet / Landscape Canonical Layout with NavigationRail
+            Row(modifier = Modifier.fillMaxSize()) {
+                AppNavigationRail(
+                    currentScreen = currentScreen,
+                    totalStars = totalStars,
+                    onNavigate = { screen ->
+                        viewModel.navigateAndClearTo(screen)
+                    },
+                    onParentalControlsClick = {
+                        viewModel.requestParentAccess {
+                            viewModel.navigateTo(Screen.ParentalControls)
                         }
+                    }
+                )
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize()
+                ) {
+                    ScreenScaffoldContent(
+                        currentScreen = currentScreen,
+                        totalStars = totalStars,
+                        allDrawings = allDrawings,
+                        gameProgressList = gameProgressList,
+                        parentalSettings = parentalSettings,
+                        activeCanvasData = activeCanvasData,
+                        todaySeconds = todaySeconds,
+                        isWideScreen = true,
+                        viewModel = viewModel,
+                        onOpenDrawer = {}
                     )
                 }
-            },
-            modifier = Modifier.fillMaxSize()
-        ) { innerPadding ->
+            }
+        } else {
+            // Mobile Compact Layout with Modal Navigation Drawer
+            ModalNavigationDrawer(
+                drawerState = drawerState,
+                drawerContent = {
+                    AppDrawerContent(
+                        currentScreen = currentScreen,
+                        totalStars = totalStars,
+                        onNavigate = { screen ->
+                            viewModel.navigateAndClearTo(screen)
+                        },
+                        onParentalControlsClick = {
+                            viewModel.requestParentAccess {
+                                viewModel.navigateTo(Screen.ParentalControls)
+                            }
+                        },
+                        onCloseDrawer = {
+                            scope.launch { drawerState.close() }
+                        }
+                    )
+                },
+                modifier = Modifier.testTag("app_navigation_drawer")
+            ) {
+                ScreenScaffoldContent(
+                    currentScreen = currentScreen,
+                    totalStars = totalStars,
+                    allDrawings = allDrawings,
+                    gameProgressList = gameProgressList,
+                    parentalSettings = parentalSettings,
+                    activeCanvasData = activeCanvasData,
+                    todaySeconds = todaySeconds,
+                    isWideScreen = false,
+                    viewModel = viewModel,
+                    onOpenDrawer = {
+                        scope.launch { drawerState.open() }
+                    }
+                )
+            }
+        }
+    }
+
+    // Parent Gate Modal
+    if (showParentGate) {
+        ParentGateDialog(
+            parentPin = parentalSettings?.pinCode ?: "1234",
+            onDismiss = { viewModel.onParentGateResult(false) },
+            onSuccess = { viewModel.onParentGateResult(true) }
+        )
+    }
+
+    // Screen Time Lock Overlay
+    if (isTimeLocked) {
+        val usedMins = todaySeconds / 60
+        val limitMins = parentalSettings?.dailyLimitMinutes ?: 30
+        ScreenTimeLockScreen(
+            usedMinutes = usedMins,
+            dailyLimitMinutes = limitMins,
+            onParentUnlockRequest = {
+                viewModel.requestParentAccess {
+                    viewModel.unlockScreenTimeTemporarily(15)
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun ScreenScaffoldContent(
+    currentScreen: Screen,
+    totalStars: Int,
+    allDrawings: List<com.example.data.DrawingEntity>,
+    gameProgressList: List<com.example.data.GameProgressEntity>,
+    parentalSettings: com.example.data.ParentalSettingsEntity?,
+    activeCanvasData: DrawingCanvasData,
+    todaySeconds: Int,
+    isWideScreen: Boolean,
+    viewModel: MainViewModel,
+    onOpenDrawer: () -> Unit
+) {
+    val showTopBar = currentScreen !is Screen.Coloring
+
+    Scaffold(
+        topBar = {
+            if (showTopBar) {
+                val title = when (currentScreen) {
+                    is Screen.Home -> "Color & Play 🎨"
+                    is Screen.GamesHub -> "Games Hub 🎮"
+                    is Screen.ColorMatch -> "Color Match 🎈"
+                    is Screen.NumberColor -> "Number Paint 🔢"
+                    is Screen.ShapeDetective -> "Shape Detective ⭐"
+                    is Screen.AlphabetColor -> "ABC Phonics 🔤"
+                    is Screen.Gallery -> "My Masterpieces 🖼️"
+                    is Screen.TrophyRoom -> "Trophies 🏆"
+                    is Screen.ParentalControls -> "Parental Controls 🛡️"
+                    else -> "Color & Play"
+                }
+
+                val isSubScreen = currentScreen !is Screen.Home
+
+                KidTopBar(
+                    title = title,
+                    showBackButton = isSubScreen,
+                    showMenuButton = !isWideScreen,
+                    totalStars = totalStars,
+                    onBackClick = { viewModel.goBack() },
+                    onOpenDrawer = onOpenDrawer,
+                    onStarsClick = {
+                        viewModel.navigateTo(Screen.TrophyRoom)
+                    }
+                )
+            }
+        },
+        modifier = Modifier.fillMaxSize()
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentAlignment = Alignment.TopCenter
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
+                    .widthIn(max = 1200.dp)
             ) {
                 when (val screen = currentScreen) {
                     is Screen.Home -> {
@@ -196,12 +303,13 @@ fun ColorPlayApp(viewModel: MainViewModel) {
                             initialCanvasData = activeCanvasData,
                             drawingId = screen.drawingId,
                             onSaveDrawing = { title ->
-                                viewModel.saveActiveDrawing(title) {
-                                    // Saved!
-                                }
+                                viewModel.saveActiveDrawing(title) {}
                             },
                             onBack = {
                                 viewModel.goBack()
+                            },
+                            onCanvasUpdated = { canvasData ->
+                                viewModel.updateActiveCanvas(canvasData)
                             },
                             onPlaySoundPop = {
                                 viewModel.soundPlayer.playPop()
@@ -313,29 +421,5 @@ fun ColorPlayApp(viewModel: MainViewModel) {
                 }
             }
         }
-    }
-
-    // Parent Gate Modal
-    if (showParentGate) {
-        ParentGateDialog(
-            parentPin = parentalSettings?.pinCode ?: "1234",
-            onDismiss = { viewModel.onParentGateResult(false) },
-            onSuccess = { viewModel.onParentGateResult(true) }
-        )
-    }
-
-    // Screen Time Lock Overlay
-    if (isTimeLocked) {
-        val usedMins = todaySeconds / 60
-        val limitMins = parentalSettings?.dailyLimitMinutes ?: 30
-        ScreenTimeLockScreen(
-            usedMinutes = usedMins,
-            dailyLimitMinutes = limitMins,
-            onParentUnlockRequest = {
-                viewModel.requestParentAccess {
-                    viewModel.unlockScreenTimeTemporarily(15)
-                }
-            }
-        )
     }
 }
