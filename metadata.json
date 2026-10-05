@@ -1,0 +1,6 @@
+{
+  "name": "Color & Play Kids",
+  "description": "Creative coloring book, drawing canvas, educational mini-games, offline gallery, and parental controls for kids.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

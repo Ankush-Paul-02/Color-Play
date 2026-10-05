@@ -1,0 +1,341 @@
+package com.example
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.model.DrawingCanvasData
+import com.example.model.GameType
+import com.example.ui.components.AppDrawerContent
+import com.example.ui.components.KidTopBar
+import com.example.ui.components.ParentGateDialog
+import com.example.ui.components.ScreenTimeLockScreen
+import com.example.ui.screens.AlphabetColorGameScreen
+import com.example.ui.screens.ColorMatchGameScreen
+import com.example.ui.screens.ColoringScreen
+import com.example.ui.screens.GalleryScreen
+import com.example.ui.screens.GamesHubScreen
+import com.example.ui.screens.HomeScreen
+import com.example.ui.screens.NumberColorGameScreen
+import com.example.ui.screens.ParentalControlsScreen
+import com.example.ui.screens.ShapeDetectiveGameScreen
+import com.example.ui.screens.TrophyScreen
+import com.example.ui.theme.MyApplicationTheme
+import com.example.viewmodel.MainViewModel
+import com.example.viewmodel.Screen
+import kotlinx.coroutines.launch
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            val viewModel: MainViewModel = viewModel()
+            val themeMode by viewModel.themeOverride.collectAsState()
+            val eyeCareMode by viewModel.eyeCareMode.collectAsState()
+
+            val isDark = when (themeMode) {
+                "dark" -> true
+                "light" -> false
+                else -> isSystemInDarkTheme()
+            }
+
+            MyApplicationTheme(darkTheme = isDark) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    ColorPlayApp(viewModel = viewModel)
+
+                    // Eye-care warm amber filter overlay
+                    if (eyeCareMode) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color(0xFFFF9F1A).copy(alpha = 0.08f))
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ColorPlayApp(viewModel: MainViewModel) {
+    val navStack by viewModel.navStack.collectAsState()
+    val currentScreen = navStack.lastOrNull() ?: Screen.Home
+
+    val allDrawings by viewModel.allDrawings.collectAsState()
+    val totalStars by viewModel.totalStars.collectAsState()
+    val gameProgressList by viewModel.gameProgressList.collectAsState()
+    val parentalSettings by viewModel.parentalSettings.collectAsState()
+    val activeCanvasData by viewModel.activeCanvasData.collectAsState()
+    val currentDrawingId by viewModel.currentDrawingId.collectAsState()
+    val isTimeLocked by viewModel.isTimeLocked.collectAsState()
+    val todaySeconds by viewModel.todaySecondsPlayed.collectAsState()
+    val showParentGate by viewModel.showParentGate.collectAsState()
+
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    // Handle system back button for drawer or screens
+    BackHandler(enabled = drawerState.isOpen) {
+        scope.launch { drawerState.close() }
+    }
+
+    // Modal Navigation Drawer
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            AppDrawerContent(
+                currentScreen = currentScreen,
+                totalStars = totalStars,
+                onNavigate = { screen ->
+                    viewModel.navigateAndClearTo(screen)
+                },
+                onParentalControlsClick = {
+                    viewModel.requestParentAccess {
+                        viewModel.navigateTo(Screen.ParentalControls)
+                    }
+                },
+                onCloseDrawer = {
+                    scope.launch { drawerState.close() }
+                }
+            )
+        },
+        modifier = Modifier.testTag("app_navigation_drawer")
+    ) {
+        val showTopBar = currentScreen !is Screen.Coloring
+
+        Scaffold(
+            topBar = {
+                if (showTopBar) {
+                    val title = when (currentScreen) {
+                        is Screen.Home -> "Color & Play 🎨"
+                        is Screen.GamesHub -> "Games Hub 🎮"
+                        is Screen.ColorMatch -> "Color Match 🎈"
+                        is Screen.NumberColor -> "Number Paint 🔢"
+                        is Screen.ShapeDetective -> "Shape Detective ⭐"
+                        is Screen.AlphabetColor -> "ABC Phonics 🔤"
+                        is Screen.Gallery -> "My Masterpieces 🖼️"
+                        is Screen.TrophyRoom -> "Trophies 🏆"
+                        is Screen.ParentalControls -> "Parental Controls 🛡️"
+                        else -> "Color & Play"
+                    }
+
+                    val isSubScreen = currentScreen !is Screen.Home
+
+                    KidTopBar(
+                        title = title,
+                        showBackButton = isSubScreen,
+                        totalStars = totalStars,
+                        onBackClick = { viewModel.goBack() },
+                        onOpenDrawer = {
+                            scope.launch { drawerState.open() }
+                        },
+                        onStarsClick = {
+                            viewModel.navigateTo(Screen.TrophyRoom)
+                        }
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                when (val screen = currentScreen) {
+                    is Screen.Home -> {
+                        HomeScreen(
+                            drawings = allDrawings,
+                            totalStars = totalStars,
+                            onStartColoring = { templateId, drawingId ->
+                                viewModel.startColoring(templateId, drawingId)
+                            },
+                            onOpenGamesHub = {
+                                viewModel.navigateTo(Screen.GamesHub)
+                            },
+                            onOpenGame = { gameScreen ->
+                                viewModel.navigateTo(gameScreen)
+                            },
+                            onOpenGallery = {
+                                viewModel.navigateTo(Screen.Gallery)
+                            },
+                            onOpenTrophies = {
+                                viewModel.navigateTo(Screen.TrophyRoom)
+                            },
+                            onParentalControlsClick = {
+                                viewModel.requestParentAccess {
+                                    viewModel.navigateTo(Screen.ParentalControls)
+                                }
+                            }
+                        )
+                    }
+
+                    is Screen.Coloring -> {
+                        ColoringScreen(
+                            templateId = screen.templateId,
+                            initialCanvasData = activeCanvasData,
+                            drawingId = screen.drawingId,
+                            onSaveDrawing = { title ->
+                                viewModel.saveActiveDrawing(title) {
+                                    // Saved!
+                                }
+                            },
+                            onBack = {
+                                viewModel.goBack()
+                            },
+                            onPlaySoundPop = {
+                                viewModel.soundPlayer.playPop()
+                            },
+                            onPlayBrushSound = {
+                                viewModel.soundPlayer.playBrushStroke()
+                            }
+                        )
+                    }
+
+                    is Screen.GamesHub -> {
+                        GamesHubScreen(
+                            totalStars = totalStars,
+                            onSelectGame = { gameScreen ->
+                                viewModel.navigateTo(gameScreen)
+                            },
+                            onBack = {
+                                viewModel.goBack()
+                            }
+                        )
+                    }
+
+                    is Screen.ColorMatch -> {
+                        ColorMatchGameScreen(
+                            onAwardStars = { stars, score ->
+                                viewModel.awardGameStars(GameType.COLOR_MATCH.id, stars, score)
+                            },
+                            onBack = { viewModel.goBack() },
+                            onPlayPopSound = { viewModel.soundPlayer.playPop() },
+                            onPlaySuccessSound = { viewModel.soundPlayer.playChimeSuccess() },
+                            onPlayErrorSound = { viewModel.soundPlayer.playErrorBuzz() }
+                        )
+                    }
+
+                    is Screen.NumberColor -> {
+                        NumberColorGameScreen(
+                            onAwardStars = { stars, score ->
+                                viewModel.awardGameStars(GameType.NUMBER_COLOR.id, stars, score)
+                            },
+                            onBack = { viewModel.goBack() },
+                            onPlayPopSound = { viewModel.soundPlayer.playPop() },
+                            onPlaySuccessSound = { viewModel.soundPlayer.playChimeSuccess() }
+                        )
+                    }
+
+                    is Screen.ShapeDetective -> {
+                        ShapeDetectiveGameScreen(
+                            onAwardStars = { stars, score ->
+                                viewModel.awardGameStars(GameType.SHAPE_DETECTIVE.id, stars, score)
+                            },
+                            onBack = { viewModel.goBack() },
+                            onPlayPopSound = { viewModel.soundPlayer.playPop() },
+                            onPlaySuccessSound = { viewModel.soundPlayer.playChimeSuccess() },
+                            onPlayErrorSound = { viewModel.soundPlayer.playErrorBuzz() }
+                        )
+                    }
+
+                    is Screen.AlphabetColor -> {
+                        AlphabetColorGameScreen(
+                            onAwardStars = { stars, score ->
+                                viewModel.awardGameStars(GameType.ALPHABET_COLOR.id, stars, score)
+                            },
+                            onBack = { viewModel.goBack() },
+                            onPlayPopSound = { viewModel.soundPlayer.playPop() }
+                        )
+                    }
+
+                    is Screen.Gallery -> {
+                        GalleryScreen(
+                            drawings = allDrawings,
+                            onOpenDrawing = { templateId, drawingId ->
+                                viewModel.startColoring(templateId, drawingId)
+                            },
+                            onDeleteDrawing = { id ->
+                                viewModel.deleteDrawing(id)
+                            },
+                            onToggleFavorite = { drawing ->
+                                viewModel.toggleFavorite(drawing)
+                            },
+                            onStartNewDrawing = {
+                                viewModel.startColoring("free_draw", null)
+                            },
+                            onBack = {
+                                viewModel.goBack()
+                            }
+                        )
+                    }
+
+                    is Screen.TrophyRoom -> {
+                        TrophyScreen(
+                            totalStars = totalStars,
+                            gameProgressList = gameProgressList,
+                            onBack = { viewModel.goBack() }
+                        )
+                    }
+
+                    is Screen.ParentalControls -> {
+                        ParentalControlsScreen(
+                            settings = parentalSettings,
+                            todaySeconds = todaySeconds,
+                            totalDrawingsCount = allDrawings.size,
+                            totalStars = totalStars,
+                            onSaveSettings = { pin, limit, sound, theme, eyeCare ->
+                                viewModel.updateParentalSettings(pin, limit, sound, theme, eyeCare)
+                            },
+                            onBack = { viewModel.goBack() }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Parent Gate Modal
+    if (showParentGate) {
+        ParentGateDialog(
+            parentPin = parentalSettings?.pinCode ?: "1234",
+            onDismiss = { viewModel.onParentGateResult(false) },
+            onSuccess = { viewModel.onParentGateResult(true) }
+        )
+    }
+
+    // Screen Time Lock Overlay
+    if (isTimeLocked) {
+        val usedMins = todaySeconds / 60
+        val limitMins = parentalSettings?.dailyLimitMinutes ?: 30
+        ScreenTimeLockScreen(
+            usedMinutes = usedMins,
+            dailyLimitMinutes = limitMins,
+            onParentUnlockRequest = {
+                viewModel.requestParentAccess {
+                    viewModel.unlockScreenTimeTemporarily(15)
+                }
+            }
+        )
+    }
+}
