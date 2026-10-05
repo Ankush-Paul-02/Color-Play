@@ -164,7 +164,37 @@ class MainViewModel(
 
     fun navigateAndClearTo(screen: Screen) {
         soundPlayer.playClick()
-        _navStack.value = listOf(Screen.Home, screen)
+        if (screen is Screen.Coloring) {
+            _currentDrawingId.value = screen.drawingId
+            viewModelScope.launch {
+                if (screen.drawingId != null) {
+                    val drawing = repository.getDrawing(screen.drawingId)
+                    if (drawing != null) {
+                        _activeCanvasData.value = DrawingCanvasData.fromJson(drawing.strokesJson)
+                    } else {
+                        _activeCanvasData.value = DrawingCanvasData(templateId = screen.templateId)
+                    }
+                } else {
+                    _activeCanvasData.value = DrawingCanvasData(templateId = screen.templateId)
+                }
+                _navStack.value = listOf(Screen.Home, screen)
+            }
+            return
+        }
+        if (screen == Screen.Home) {
+            _navStack.value = listOf(Screen.Home)
+        } else {
+            _navStack.value = listOf(Screen.Home, screen)
+        }
+    }
+
+    fun navigateToScreen(screen: Screen) {
+        soundPlayer.playClick()
+        if (screen is Screen.Coloring) {
+            startColoring(screen.templateId, screen.drawingId)
+        } else {
+            navigateAndClearTo(screen)
+        }
     }
 
     fun goBack(): Boolean {

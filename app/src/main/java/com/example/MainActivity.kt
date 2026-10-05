@@ -9,11 +9,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
@@ -126,11 +128,7 @@ fun ColorPlayApp(viewModel: MainViewModel) {
                     currentScreen = currentScreen,
                     totalStars = totalStars,
                     onNavigate = { screen ->
-                        if (screen is Screen.Coloring) {
-                            viewModel.startColoring(screen.templateId, screen.drawingId)
-                        } else {
-                            viewModel.navigateAndClearTo(screen)
-                        }
+                        viewModel.navigateAndClearTo(screen)
                     },
                     onParentalControlsClick = {
                         viewModel.requestParentAccess {
@@ -160,20 +158,14 @@ fun ColorPlayApp(viewModel: MainViewModel) {
             }
         } else {
             // Mobile Compact Layout with Modal Navigation Drawer
-            // Only allow edge-swipe to open when on Home screen so drawing & games are never interrupted
             ModalNavigationDrawer(
                 drawerState = drawerState,
-                gesturesEnabled = drawerState.isOpen || (currentScreen is Screen.Home && !isWideScreen),
                 drawerContent = {
                     AppDrawerContent(
                         currentScreen = currentScreen,
                         totalStars = totalStars,
                         onNavigate = { screen ->
-                            if (screen is Screen.Coloring) {
-                                viewModel.startColoring(screen.templateId, screen.drawingId)
-                            } else {
-                                viewModel.navigateAndClearTo(screen)
-                            }
+                            viewModel.navigateAndClearTo(screen)
                         },
                         onParentalControlsClick = {
                             viewModel.requestParentAccess {
