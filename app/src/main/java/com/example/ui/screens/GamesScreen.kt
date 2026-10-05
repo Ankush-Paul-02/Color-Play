@@ -863,15 +863,51 @@ fun AlphabetColorGameScreen(
                 Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
             }
             Text(
-                text = "ABC Phonics & Animals 🔤",
+                text = "Letter ${item.letter} (${selectedIndex + 1}/${AlphabetCatalog.size}) 🔤",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
-            IconButton(onClick = {
-                drawnPoints.clear()
-                onPlayPopSound()
-            }) {
-                Icon(imageVector = Icons.Default.Refresh, contentDescription = "Clear")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = {
+                        if (selectedIndex > 0) {
+                            selectedIndex--
+                            drawnPoints.clear()
+                            onPlayPopSound()
+                        }
+                    },
+                    enabled = selectedIndex > 0,
+                    modifier = Modifier.testTag("alphabet_prev_letter")
+                ) {
+                    Text(
+                        text = "◀",
+                        fontSize = 16.sp,
+                        color = if (selectedIndex > 0) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.4f)
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        if (selectedIndex < AlphabetCatalog.lastIndex) {
+                            selectedIndex++
+                            drawnPoints.clear()
+                            onPlayPopSound()
+                        }
+                    },
+                    enabled = selectedIndex < AlphabetCatalog.lastIndex,
+                    modifier = Modifier.testTag("alphabet_next_letter")
+                ) {
+                    Text(
+                        text = "▶",
+                        fontSize = 16.sp,
+                        color = if (selectedIndex < AlphabetCatalog.lastIndex) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.4f)
+                    )
+                }
+                IconButton(onClick = {
+                    drawnPoints.clear()
+                    onPlayPopSound()
+                }, modifier = Modifier.testTag("alphabet_clear_trace")) {
+                    Icon(imageVector = Icons.Default.Refresh, contentDescription = "Clear")
+                }
             }
         }
 

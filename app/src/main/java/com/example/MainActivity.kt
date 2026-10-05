@@ -8,6 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -23,7 +24,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -100,33 +100,97 @@ fun ColorPlayApp(viewModel: MainViewModel) {
     val todaySeconds by viewModel.todaySecondsPlayed.collectAsState()
     val showParentGate by viewModel.showParentGate.collectAsState()
 
-    val configuration = LocalConfiguration.current
-    val isWideScreen = configuration.screenWidthDp >= 720
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
 
-    if (isWideScreen) {
-        // Adaptive Tablet / Landscape Canonical Layout with NavigationRail
-        TabletRailLayout(
-            currentScreen = currentScreen,
-            totalStars = totalStars,
-            allDrawings = allDrawings,
-            gameProgressList = gameProgressList,
-            parentalSettings = parentalSettings,
-            activeCanvasData = activeCanvasData,
-            todaySeconds = todaySeconds,
-            viewModel = viewModel
-        )
-    } else {
-        // Mobile Compact Layout with Modal Navigation Drawer
-        PhoneDrawerLayout(
-            currentScreen = currentScreen,
-            totalStars = totalStars,
-            allDrawings = allDrawings,
-            gameProgressList = gameProgressList,
-            parentalSettings = parentalSettings,
-            activeCanvasData = activeCanvasData,
-            todaySeconds = todaySeconds,
-            viewModel = viewModel
-        )
+    // Proper Android Back Navigation:
+    // If the drawer is open, back closes the drawer.
+    BackHandler(enabled = drawerState.isOpen) {
+        scope.launch { drawerState.close() }
+    }
+
+    // If on a subscreen and drawer is closed, back navigates back through ViewModel navigation stack
+    BackHandler(enabled = !drawerState.isOpen && currentScreen !is Screen.Home) {
+        viewModel.goBack()
+    }
+
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isWideScreen = maxWidth >= 720.dp
+
+        if (isWideScreen) {
+            // Adaptive Tablet / Landscape Canonical Layout with NavigationRail
+            Row(modifier = Modifier.fillMaxSize()) {
+                AppNavigationRail(
+                    currentScreen = currentScreen,
+                    totalStars = totalStars,
+                    onNavigate = { screen ->
+                        viewModel.navigateAndClearTo(screen)
+                    },
+                    onParentalControlsClick = {
+                        viewModel.requestParentAccess {
+                            viewModel.navigateTo(Screen.ParentalControls)
+                        }
+                    }
+                )
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize()
+                ) {
+                    ScreenScaffoldContent(
+                        currentScreen = currentScreen,
+                        totalStars = totalStars,
+                        allDrawings = allDrawings,
+                        gameProgressList = gameProgressList,
+                        parentalSettings = parentalSettings,
+                        activeCanvasData = activeCanvasData,
+                        todaySeconds = todaySeconds,
+                        isWideScreen = true,
+                        viewModel = viewModel,
+                        onOpenDrawer = {}
+                    )
+                }
+            }
+        } else {
+            // Mobile Compact Layout with Modal Navigation Drawer
+            ModalNavigationDrawer(
+                drawerState = drawerState,
+                drawerContent = {
+                    AppDrawerContent(
+                        currentScreen = currentScreen,
+                        totalStars = totalStars,
+                        onNavigate = { screen ->
+                            viewModel.navigateAndClearTo(screen)
+                        },
+                        onParentalControlsClick = {
+                            viewModel.requestParentAccess {
+                                viewModel.navigateTo(Screen.ParentalControls)
+                            }
+                        },
+                        onCloseDrawer = {
+                            scope.launch { drawerState.close() }
+                        }
+                    )
+                },
+                modifier = Modifier.testTag("app_navigation_drawer")
+            ) {
+                ScreenScaffoldContent(
+                    currentScreen = currentScreen,
+                    totalStars = totalStars,
+                    allDrawings = allDrawings,
+                    gameProgressList = gameProgressList,
+                    parentalSettings = parentalSettings,
+                    activeCanvasData = activeCanvasData,
+                    todaySeconds = todaySeconds,
+                    isWideScreen = false,
+                    viewModel = viewModel,
+                    onOpenDrawer = {
+                        scope.launch { drawerState.open() }
+                    }
+                )
+            }
+        }
     }
 
     // Parent Gate Modal
@@ -149,108 +213,6 @@ fun ColorPlayApp(viewModel: MainViewModel) {
                 viewModel.requestParentAccess {
                     viewModel.unlockScreenTimeTemporarily(15)
                 }
-            }
-        )
-    }
-}
-
-@Composable
-private fun TabletRailLayout(
-    currentScreen: Screen,
-    totalStars: Int,
-    allDrawings: List<DrawingEntity>,
-    gameProgressList: List<GameProgressEntity>,
-    parentalSettings: ParentalSettingsEntity?,
-    activeCanvasData: DrawingCanvasData,
-    todaySeconds: Int,
-    viewModel: MainViewModel
-) {
-    Row(modifier = Modifier.fillMaxSize()) {
-        AppNavigationRail(
-            currentScreen = currentScreen,
-            totalStars = totalStars,
-            onNavigate = { screen ->
-                viewModel.navigateAndClearTo(screen)
-            },
-            onParentalControlsClick = {
-                viewModel.requestParentAccess {
-                    viewModel.navigateTo(Screen.ParentalControls)
-                }
-            }
-        )
-
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxSize()
-        ) {
-            ScreenScaffoldContent(
-                currentScreen = currentScreen,
-                totalStars = totalStars,
-                allDrawings = allDrawings,
-                gameProgressList = gameProgressList,
-                parentalSettings = parentalSettings,
-                activeCanvasData = activeCanvasData,
-                todaySeconds = todaySeconds,
-                isWideScreen = true,
-                viewModel = viewModel,
-                onOpenDrawer = {}
-            )
-        }
-    }
-}
-
-@Composable
-private fun PhoneDrawerLayout(
-    currentScreen: Screen,
-    totalStars: Int,
-    allDrawings: List<DrawingEntity>,
-    gameProgressList: List<GameProgressEntity>,
-    parentalSettings: ParentalSettingsEntity?,
-    activeCanvasData: DrawingCanvasData,
-    todaySeconds: Int,
-    viewModel: MainViewModel
-) {
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
-
-    BackHandler(enabled = drawerState.isOpen) {
-        scope.launch { drawerState.close() }
-    }
-
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            AppDrawerContent(
-                currentScreen = currentScreen,
-                totalStars = totalStars,
-                onNavigate = { screen ->
-                    viewModel.navigateAndClearTo(screen)
-                },
-                onParentalControlsClick = {
-                    viewModel.requestParentAccess {
-                        viewModel.navigateTo(Screen.ParentalControls)
-                    }
-                },
-                onCloseDrawer = {
-                    scope.launch { drawerState.close() }
-                }
-            )
-        },
-        modifier = Modifier.testTag("app_navigation_drawer")
-    ) {
-        ScreenScaffoldContent(
-            currentScreen = currentScreen,
-            totalStars = totalStars,
-            allDrawings = allDrawings,
-            gameProgressList = gameProgressList,
-            parentalSettings = parentalSettings,
-            activeCanvasData = activeCanvasData,
-            todaySeconds = todaySeconds,
-            isWideScreen = false,
-            viewModel = viewModel,
-            onOpenDrawer = {
-                scope.launch { drawerState.open() }
             }
         )
     }

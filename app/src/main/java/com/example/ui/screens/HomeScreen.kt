@@ -35,12 +35,18 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.DrawingEntity
+import com.example.model.ColorTemplate
 import com.example.model.GameType
 import com.example.model.TemplateRegistry
 import com.example.viewmodel.Screen
@@ -67,49 +74,121 @@ fun HomeScreen(
     onParentalControlsClick: () -> Unit
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val isTablet = maxWidth >= 720.dp
+    val isTablet = maxWidth >= 720.dp
+    var selectedLevelFilter by remember { mutableIntStateOf(-1) }
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .testTag("home_screen_scroll"),
-            contentPadding = PaddingValues(bottom = 32.dp)
-        ) {
-            // Hero Card
-            item {
-                HeroWelcomeBanner(
-                    totalStars = totalStars,
-                    onFreeDraw = { onStartColoring("free_draw", null) },
-                    onPlayGames = onOpenGamesHub
-                )
-            }
+    val filteredTemplates = remember(selectedLevelFilter) {
+        if (selectedLevelFilter == -1) {
+            TemplateRegistry.templates
+        } else {
+            TemplateRegistry.templates.filter { it.level == selectedLevelFilter }
+        }
+    }
 
-            // Coloring Templates Section
-            item {
-                SectionHeader(
-                    title = "🎨 Choose a Coloring Page",
-                    subtitle = "Pick your favorite friend to color!",
-                    actionLabel = "All Pages",
-                    onAction = { onStartColoring("rooster", null) }
-                )
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("home_screen_scroll"),
+        contentPadding = PaddingValues(bottom = 32.dp)
+    ) {
+        // Hero Card
+        item {
+            HeroWelcomeBanner(
+                totalStars = totalStars,
+                onFreeDraw = { onStartColoring("free_draw", null) },
+                onPlayGames = onOpenGamesHub
+            )
+        }
 
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    modifier = Modifier.padding(top = 8.dp, bottom = 12.dp)
-                ) {
-                    items(TemplateRegistry.templates) { template ->
-                        ColoringTemplateCard(
-                            emoji = template.emoji,
-                            title = template.name,
-                            category = template.category,
-                            difficulty = template.difficulty,
-                            testTag = "template_card_${template.id}",
-                            onClick = { onStartColoring(template.id, null) }
-                        )
-                    }
+        // Coloring Templates Section
+        item {
+            SectionHeader(
+                title = "🎨 Choose a Coloring Page",
+                subtitle = "Progress through Level 1, 2 & 3 or paint freely!",
+                actionLabel = if (selectedLevelFilter == -1) "Show All" else "Reset Filter",
+                onAction = { selectedLevelFilter = -1 }
+            )
+
+            // Level Filter Chips
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+            ) {
+                item {
+                    FilterChip(
+                        selected = selectedLevelFilter == -1,
+                        onClick = { selectedLevelFilter = -1 },
+                        label = { Text("🌈 All (${TemplateRegistry.templates.size})") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer
+                        ),
+                        modifier = Modifier.testTag("filter_all_levels")
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = selectedLevelFilter == 1,
+                        onClick = { selectedLevelFilter = 1 },
+                        label = { Text("⭐ Level 1: Starter") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xFFFFD32A).copy(alpha = 0.35f)
+                        ),
+                        modifier = Modifier.testTag("filter_level_1")
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = selectedLevelFilter == 2,
+                        onClick = { selectedLevelFilter = 2 },
+                        label = { Text("🌟 Level 2: Explorer") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xFFFF9F1A).copy(alpha = 0.35f)
+                        ),
+                        modifier = Modifier.testTag("filter_level_2")
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = selectedLevelFilter == 3,
+                        onClick = { selectedLevelFilter = 3 },
+                        label = { Text("👑 Level 3: Master") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xFFFF5252).copy(alpha = 0.35f)
+                        ),
+                        modifier = Modifier.testTag("filter_level_3")
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = selectedLevelFilter == 0,
+                        onClick = { selectedLevelFilter = 0 },
+                        label = { Text("🎨 Free Canvas") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer
+                        ),
+                        modifier = Modifier.testTag("filter_free_canvas")
+                    )
                 }
             }
+
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
+            ) {
+                items(filteredTemplates) { template ->
+                    val isUnlocked = totalStars >= template.starsRequired || template.level == 0
+                    ColoringTemplateCard(
+                        template = template,
+                        isUnlocked = isUnlocked,
+                        totalStars = totalStars,
+                        testTag = "template_card_${template.id}",
+                        onClick = { onStartColoring(template.id, null) }
+                    )
+                }
+            }
+        }
 
             // Educational Games Section (Responsive Grid for tablets)
             item {
@@ -515,17 +594,23 @@ private fun SectionHeader(
 
 @Composable
 private fun ColoringTemplateCard(
-    emoji: String,
-    title: String,
-    category: String,
-    difficulty: String,
+    template: ColorTemplate,
+    isUnlocked: Boolean,
+    totalStars: Int,
     testTag: String,
     onClick: () -> Unit
 ) {
+    val levelBadgeColor = when (template.level) {
+        1 -> Color(0xFFFFD32A)
+        2 -> Color(0xFFFF9F1A)
+        3 -> Color(0xFFFF5252)
+        else -> MaterialTheme.colorScheme.primary
+    }
+
     Card(
         modifier = Modifier
-            .width(148.dp)
-            .height(186.dp)
+            .width(160.dp)
+            .height(205.dp)
             .clickable { onClick() }
             .testTag(testTag),
         shape = RoundedCornerShape(22.dp),
@@ -535,30 +620,64 @@ private fun ColoringTemplateCard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(14.dp),
+                .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
+            // Level indicator chip at top
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = levelBadgeColor.copy(alpha = 0.2f)
+                ) {
+                    Text(
+                        text = if (template.level == 0) "🎨 Free" else "Lvl ${template.level}",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = levelBadgeColor,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isUnlocked) Color(0xFF2ED573).copy(alpha = 0.2f) else Color(0xFFFFB142).copy(alpha = 0.25f)
+                ) {
+                    Text(
+                        text = if (template.starsRequired == 0) "✨ Free" else if (isUnlocked) "🔓 Ready" else "⭐ ${template.starsRequired}",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isUnlocked) Color(0xFF20BF6B) else Color(0xFFE17055),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier.size(68.dp),
+                modifier = Modifier.size(66.dp),
                 shadowElevation = 2.dp
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text(text = emoji, fontSize = 38.sp)
+                    Text(text = template.emoji, fontSize = 36.sp)
                 }
             }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = title,
+                    text = template.name,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    maxLines = 1
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
                 Text(
-                    text = category,
+                    text = template.category,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -569,7 +688,7 @@ private fun ColoringTemplateCard(
                 color = MaterialTheme.colorScheme.primaryContainer
             ) {
                 Text(
-                    text = difficulty,
+                    text = template.difficulty,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
