@@ -9,7 +9,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -160,6 +159,7 @@ fun ColorPlayApp(viewModel: MainViewModel) {
             // Mobile Compact Layout with Modal Navigation Drawer
             ModalNavigationDrawer(
                 drawerState = drawerState,
+                gesturesEnabled = drawerState.isOpen || (currentScreen is Screen.Home),
                 drawerContent = {
                     AppDrawerContent(
                         currentScreen = currentScreen,
@@ -235,12 +235,8 @@ private fun ScreenScaffoldContent(
     viewModel: MainViewModel,
     onOpenDrawer: () -> Unit
 ) {
-    // Show TopBar only on hub and settings screens. Games and Coloring have their own dedicated headers.
-    val showTopBar = currentScreen is Screen.Home ||
-            currentScreen is Screen.GamesHub ||
-            currentScreen is Screen.Gallery ||
-            currentScreen is Screen.TrophyRoom ||
-            currentScreen is Screen.ParentalControls
+    // Show TopBar only on Home and Games Hub. Subscreens (Gallery, Trophies, Parental Controls, Coloring, Games) have their own dedicated top bars.
+    val showTopBar = currentScreen is Screen.Home || currentScreen is Screen.GamesHub
 
     Scaffold(
         topBar = {
@@ -248,9 +244,6 @@ private fun ScreenScaffoldContent(
                 val title = when (currentScreen) {
                     is Screen.Home -> "Color & Play 🎨"
                     is Screen.GamesHub -> "Games Hub 🎮"
-                    is Screen.Gallery -> "My Masterpieces 🖼️"
-                    is Screen.TrophyRoom -> "Trophies 🏆"
-                    is Screen.ParentalControls -> "Parental Controls 🛡️"
                     else -> "Color & Play"
                 }
 
