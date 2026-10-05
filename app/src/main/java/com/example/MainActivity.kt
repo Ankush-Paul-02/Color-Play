@@ -8,7 +8,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -117,67 +117,29 @@ fun ColorPlayApp(viewModel: MainViewModel) {
         viewModel.goBack()
     }
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val isWideScreen = maxWidth >= 720.dp
+    val configuration = LocalConfiguration.current
+    val isWideScreen = configuration.screenWidthDp >= 720
 
-        if (isWideScreen) {
-            // Adaptive Tablet / Landscape Canonical Layout with NavigationRail
-            Row(modifier = Modifier.fillMaxSize()) {
-                AppNavigationRail(
-                    currentScreen = currentScreen,
-                    totalStars = totalStars,
-                    onNavigate = { screen ->
-                        viewModel.navigateAndClearTo(screen)
-                    },
-                    onParentalControlsClick = {
-                        viewModel.requestParentAccess {
-                            viewModel.navigateTo(Screen.ParentalControls)
-                        }
-                    }
-                )
-
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxSize()
-                ) {
-                    ScreenScaffoldContent(
-                        currentScreen = currentScreen,
-                        totalStars = totalStars,
-                        allDrawings = allDrawings,
-                        gameProgressList = gameProgressList,
-                        parentalSettings = parentalSettings,
-                        activeCanvasData = activeCanvasData,
-                        todaySeconds = todaySeconds,
-                        isWideScreen = true,
-                        viewModel = viewModel,
-                        onOpenDrawer = {}
-                    )
-                }
-            }
-        } else {
-            // Mobile Compact Layout with Modal Navigation Drawer
-            ModalNavigationDrawer(
-                drawerState = drawerState,
-                gesturesEnabled = drawerState.isOpen || (currentScreen is Screen.Home),
-                drawerContent = {
-                    AppDrawerContent(
-                        currentScreen = currentScreen,
-                        totalStars = totalStars,
-                        onNavigate = { screen ->
-                            viewModel.navigateAndClearTo(screen)
-                        },
-                        onParentalControlsClick = {
-                            viewModel.requestParentAccess {
-                                viewModel.navigateTo(Screen.ParentalControls)
-                            }
-                        },
-                        onCloseDrawer = {
-                            scope.launch { drawerState.close() }
-                        }
-                    )
+    if (isWideScreen) {
+        // Adaptive Tablet / Landscape Canonical Layout with NavigationRail
+        Row(modifier = Modifier.fillMaxSize()) {
+            AppNavigationRail(
+                currentScreen = currentScreen,
+                totalStars = totalStars,
+                onNavigate = { screen ->
+                    viewModel.navigateAndClearTo(screen)
                 },
-                modifier = Modifier.testTag("app_navigation_drawer")
+                onParentalControlsClick = {
+                    viewModel.requestParentAccess {
+                        viewModel.navigateTo(Screen.ParentalControls)
+                    }
+                }
+            )
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxSize()
             ) {
                 ScreenScaffoldContent(
                     currentScreen = currentScreen,
@@ -187,13 +149,50 @@ fun ColorPlayApp(viewModel: MainViewModel) {
                     parentalSettings = parentalSettings,
                     activeCanvasData = activeCanvasData,
                     todaySeconds = todaySeconds,
-                    isWideScreen = false,
+                    isWideScreen = true,
                     viewModel = viewModel,
-                    onOpenDrawer = {
-                        scope.launch { drawerState.open() }
-                    }
+                    onOpenDrawer = {}
                 )
             }
+        }
+    } else {
+        // Mobile Compact Layout with Modal Navigation Drawer
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            gesturesEnabled = drawerState.isOpen || (currentScreen is Screen.Home),
+            drawerContent = {
+                AppDrawerContent(
+                    currentScreen = currentScreen,
+                    totalStars = totalStars,
+                    onNavigate = { screen ->
+                        viewModel.navigateAndClearTo(screen)
+                    },
+                    onParentalControlsClick = {
+                        viewModel.requestParentAccess {
+                            viewModel.navigateTo(Screen.ParentalControls)
+                        }
+                    },
+                    onCloseDrawer = {
+                        scope.launch { drawerState.close() }
+                    }
+                )
+            },
+            modifier = Modifier.testTag("app_navigation_drawer")
+        ) {
+            ScreenScaffoldContent(
+                currentScreen = currentScreen,
+                totalStars = totalStars,
+                allDrawings = allDrawings,
+                gameProgressList = gameProgressList,
+                parentalSettings = parentalSettings,
+                activeCanvasData = activeCanvasData,
+                todaySeconds = todaySeconds,
+                isWideScreen = false,
+                viewModel = viewModel,
+                onOpenDrawer = {
+                    scope.launch { drawerState.open() }
+                }
+            )
         }
     }
 
