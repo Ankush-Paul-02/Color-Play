@@ -160,7 +160,7 @@ fun AppDrawerContent(
                 selected = currentScreen is Screen.Coloring && currentScreen.templateId != "free_draw",
                 testTag = "drawer_item_coloring",
                 onClick = {
-                    onNavigate(Screen.Coloring(templateId = "rooster"))
+                    onNavigate(Screen.Coloring(templateId = "star"))
                     onCloseDrawer()
                 }
             )

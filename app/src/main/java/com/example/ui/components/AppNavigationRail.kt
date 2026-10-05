@@ -106,7 +106,7 @@ fun AppNavigationRail(
                 icon = Icons.Default.ColorLens,
                 selected = currentScreen is Screen.Coloring && currentScreen.templateId != "free_draw",
                 testTag = "rail_coloring",
-                onClick = { onNavigate(Screen.Coloring("rooster")) }
+                onClick = { onNavigate(Screen.Coloring("star")) }
             )
 
             RailItem(

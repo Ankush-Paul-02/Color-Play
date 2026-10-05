@@ -106,12 +106,16 @@ fun ColoringScreen(
 
     val template = remember(templateId) { TemplateRegistry.getById(templateId) }
 
-    // Active strokes and undo/redo stacks
-    val paths = remember { mutableStateListOf<DrawingPath>().apply { addAll(initialCanvasData.paths) } }
-    val undonePaths = remember { mutableStateListOf<DrawingPath>() }
+    // Active strokes and undo/redo stacks keyed on templateId and drawingId so different drawings don't bleed into each other
+    val paths = remember(templateId, drawingId) {
+        mutableStateListOf<DrawingPath>().apply { addAll(initialCanvasData.paths) }
+    }
+    val undonePaths = remember(templateId, drawingId) { mutableStateListOf<DrawingPath>() }
 
-    val stamps = remember { mutableStateListOf<PlacedStamp>().apply { addAll(initialCanvasData.stamps) } }
-    val undoneStamps = remember { mutableStateListOf<PlacedStamp>() }
+    val stamps = remember(templateId, drawingId) {
+        mutableStateListOf<PlacedStamp>().apply { addAll(initialCanvasData.stamps) }
+    }
+    val undoneStamps = remember(templateId, drawingId) { mutableStateListOf<PlacedStamp>() }
 
     // Tool state
     var selectedColor by remember { mutableLongStateOf(0xFFFF3838) }
@@ -126,7 +130,7 @@ fun ColoringScreen(
     // Save Dialog State
     var showSaveDialog by remember { mutableStateOf(false) }
     var showClearConfirmDialog by remember { mutableStateOf(false) }
-    var drawingTitle by remember { mutableStateOf(template.defaultTitle) }
+    var drawingTitle by remember(templateId, drawingId) { mutableStateOf(template.defaultTitle) }
     var showCelebration by remember { mutableStateOf(false) }
 
     // Current in-progress stroke with accurate coordinate tracking
