@@ -48,6 +48,7 @@ import com.example.ui.screens.GamesHubScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.NumberColorGameScreen
 import com.example.ui.screens.ParentalControlsScreen
+import com.example.ui.screens.PhotoToArtScreen
 import com.example.ui.screens.ShapeDetectiveGameScreen
 import com.example.ui.screens.TrophyScreen
 import com.example.ui.theme.MyApplicationTheme
@@ -283,6 +284,9 @@ private fun ScreenScaffoldContent(
                             onStartColoring = { templateId, drawingId ->
                                 viewModel.startColoring(templateId, drawingId)
                             },
+                            onOpenPhotoToArt = {
+                                viewModel.navigateTo(Screen.PhotoToArt)
+                            },
                             onOpenGamesHub = {
                                 viewModel.navigateTo(Screen.GamesHub)
                             },
@@ -383,6 +387,17 @@ private fun ScreenScaffoldContent(
                         )
                     }
 
+                    is Screen.PhotoToArt -> {
+                        PhotoToArtScreen(
+                            onStartColoring = { lineArtBitmap ->
+                                viewModel.startColoringFromPhoto(lineArtBitmap)
+                            },
+                            onBack = { viewModel.goBack() },
+                            onPlayPopSound = { viewModel.soundPlayer.playPop() },
+                            onPlaySuccessSound = { viewModel.soundPlayer.playChimeSuccess() }
+                        )
+                    }
+
                     is Screen.Gallery -> {
                         GalleryScreen(
                             drawings = allDrawings,
@@ -397,6 +412,9 @@ private fun ScreenScaffoldContent(
                             },
                             onStartNewDrawing = {
                                 viewModel.startColoring("free_draw", null)
+                            },
+                            onOpenPhotoToArt = {
+                                viewModel.navigateTo(Screen.PhotoToArt)
                             },
                             onBack = {
                                 viewModel.goBack()

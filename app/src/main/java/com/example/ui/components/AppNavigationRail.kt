@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.ColorLens
@@ -104,9 +105,17 @@ fun AppNavigationRail(
             RailItem(
                 label = "Coloring",
                 icon = Icons.Default.ColorLens,
-                selected = currentScreen is Screen.Coloring && currentScreen.templateId != "free_draw",
+                selected = currentScreen is Screen.Coloring && currentScreen.templateId != "free_draw" && currentScreen.templateId != "photo_art",
                 testTag = "rail_coloring",
                 onClick = { onNavigate(Screen.Coloring("star")) }
+            )
+
+            RailItem(
+                label = "Photo Art",
+                icon = Icons.Default.CameraAlt,
+                selected = currentScreen is Screen.PhotoToArt,
+                testTag = "rail_photo_art",
+                onClick = { onNavigate(Screen.PhotoToArt) }
             )
 
             RailItem(

@@ -73,11 +73,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.BrushMode
@@ -89,6 +91,7 @@ import com.example.model.StrokePoint
 import com.example.model.TemplateRegistry
 import com.example.ui.components.ConfettiEffect
 import com.example.ui.theme.DrawingColors
+import com.example.util.PhotoLineArtConverter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -105,6 +108,15 @@ fun ColoringScreen(
     BackHandler { onBack() }
 
     val template = remember(templateId) { TemplateRegistry.getById(templateId) }
+
+    // Custom Photo Line Art Overlay if this drawing was generated from a photo
+    val photoLineArtBitmap = remember(initialCanvasData.photoLineArtBase64) {
+        initialCanvasData.photoLineArtBase64?.let { base64 ->
+            PhotoLineArtConverter.base64ToBitmap(base64)?.let { bmp ->
+                PhotoLineArtConverter.createTransparentLineOverlay(bmp).asImageBitmap()
+            }
+        }
+    }
 
     // Active strokes and undo/redo stacks keyed on templateId and drawingId so different drawings don't bleed into each other
     val paths = remember(templateId, drawingId) {
@@ -137,7 +149,7 @@ fun ColoringScreen(
     var currentStrokePoints by remember { mutableStateOf<List<StrokePoint>?>(null) }
 
     fun notifyUpdate() {
-        onCanvasUpdated(DrawingCanvasData(paths.toList(), stamps.toList(), templateId))
+        onCanvasUpdated(DrawingCanvasData(paths.toList(), stamps.toList(), templateId, initialCanvasData.photoLineArtBase64))
     }
 
     Column(
@@ -514,7 +526,12 @@ fun ColoringScreen(
                 }
 
                 // 4. Draw template outline on top so boundaries remain crisp and clear!
-                if (templateId != "free_draw") {
+                if (photoLineArtBitmap != null) {
+                    drawImage(
+                        image = photoLineArtBitmap,
+                        dstSize = IntSize(size.width.toInt(), size.height.toInt())
+                    )
+                } else if (templateId != "free_draw" && templateId != "photo_art") {
                     TemplateRegistry.drawTemplateOutline(this, templateId, Color(0xFF2D3436))
                 }
             }

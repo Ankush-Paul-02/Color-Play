@@ -1,5 +1,6 @@
 package com.example.viewmodel
 
+import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -13,6 +14,7 @@ import com.example.data.GameProgressEntity
 import com.example.data.ParentalSettingsEntity
 import com.example.model.DrawingCanvasData
 import com.example.model.GameType
+import com.example.util.PhotoLineArtConverter
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +31,7 @@ import java.util.Locale
 sealed interface Screen {
     data object Home : Screen
     data class Coloring(val templateId: String = "rooster", val drawingId: Long? = null) : Screen
+    data object PhotoToArt : Screen
     data object GamesHub : Screen
     data object ColorMatch : Screen
     data object NumberColor : Screen
@@ -224,6 +227,19 @@ class MainViewModel(
             }
             navigateTo(Screen.Coloring(templateId, drawingId))
         }
+    }
+
+    fun startColoringFromPhoto(lineArtBitmap: Bitmap, defaultTitle: String = "My Photo Coloring") {
+        soundPlayer.playChimeSuccess()
+        val base64 = PhotoLineArtConverter.bitmapToBase64(lineArtBitmap)
+        _currentDrawingId.value = null
+        _activeCanvasData.value = DrawingCanvasData(
+            paths = emptyList(),
+            stamps = emptyList(),
+            templateId = "photo_art",
+            photoLineArtBase64 = base64
+        )
+        navigateTo(Screen.Coloring("photo_art", null))
     }
 
     fun updateActiveCanvas(data: DrawingCanvasData) {

@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.ColorLens
@@ -157,10 +158,21 @@ fun AppDrawerContent(
             DrawerNavItem(
                 label = "Coloring Pages",
                 icon = Icons.Default.ColorLens,
-                selected = currentScreen is Screen.Coloring && currentScreen.templateId != "free_draw",
+                selected = currentScreen is Screen.Coloring && currentScreen.templateId != "free_draw" && currentScreen.templateId != "photo_art",
                 testTag = "drawer_item_coloring",
                 onClick = {
                     onNavigate(Screen.Coloring(templateId = "star"))
+                    onCloseDrawer()
+                }
+            )
+
+            DrawerNavItem(
+                label = "Photo to Line Art 📸",
+                icon = Icons.Default.CameraAlt,
+                selected = currentScreen is Screen.PhotoToArt,
+                testTag = "drawer_item_photo_to_art",
+                onClick = {
+                    onNavigate(Screen.PhotoToArt)
                     onCloseDrawer()
                 }
             )

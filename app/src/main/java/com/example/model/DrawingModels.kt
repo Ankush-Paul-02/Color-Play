@@ -44,11 +44,15 @@ data class PlacedStamp(
 data class DrawingCanvasData(
     val paths: List<DrawingPath> = emptyList(),
     val stamps: List<PlacedStamp> = emptyList(),
-    val templateId: String = "free_draw"
+    val templateId: String = "free_draw",
+    val photoLineArtBase64: String? = null
 ) {
     fun toJson(): String {
         val root = JSONObject()
         root.put("templateId", templateId)
+        if (!photoLineArtBase64.isNullOrBlank()) {
+            root.put("photoLineArtBase64", photoLineArtBase64)
+        }
 
         val pathsArray = JSONArray()
         for (path in paths) {
@@ -129,7 +133,9 @@ data class DrawingCanvasData(
                     }
                 }
 
-                DrawingCanvasData(pathsList, stampsList, templateId)
+                val photoLineArtBase64 = root.optString("photoLineArtBase64", "").ifBlank { null }
+
+                DrawingCanvasData(pathsList, stampsList, templateId, photoLineArtBase64)
             } catch (_: Exception) {
                 DrawingCanvasData()
             }

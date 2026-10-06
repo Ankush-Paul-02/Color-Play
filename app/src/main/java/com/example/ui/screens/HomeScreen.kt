@@ -67,6 +67,7 @@ fun HomeScreen(
     drawings: List<DrawingEntity>,
     totalStars: Int,
     onStartColoring: (templateId: String, drawingId: Long?) -> Unit,
+    onOpenPhotoToArt: () -> Unit = {},
     onOpenGamesHub: () -> Unit,
     onOpenGame: (Screen) -> Unit,
     onOpenGallery: () -> Unit,
@@ -98,6 +99,76 @@ fun HomeScreen(
                 onFreeDraw = { onStartColoring("free_draw", null) },
                 onPlayGames = onOpenGamesHub
             )
+        }
+
+        // Magic Photo to Line Art Banner
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .clickable { onOpenPhotoToArt() }
+                    .testTag("home_photo_to_art_banner"),
+                shape = RoundedCornerShape(24.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFF6C5CE7), Color(0xFFA29BFE), Color(0xFF74B9FF))
+                            )
+                        )
+                        .padding(18.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color.White,
+                            modifier = Modifier.size(56.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(text = "📸✨", fontSize = 28.sp)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color.White.copy(alpha = 0.25f)
+                            ) {
+                                Text(
+                                    text = "NEW MAGIC FEATURE",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color.White,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Photo to Line Art! 🖍️",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Snap a photo of your toy or pet and color it in!",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.92f)
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = "Open",
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+            }
         }
 
         // Coloring Templates Section

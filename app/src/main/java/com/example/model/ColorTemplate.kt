@@ -172,6 +172,18 @@ object TemplateRegistry {
             levelName = "Free Draw",
             starsRequired = 0,
             defaultTitle = "My Masterpiece"
+        ),
+        // PHOTO TO LINE ART COLORING
+        ColorTemplate(
+            id = "photo_art",
+            name = "Magic Photo Art",
+            category = "Camera",
+            emoji = "📸",
+            difficulty = "All Ages",
+            level = 0,
+            levelName = "Photo Art",
+            starsRequired = 0,
+            defaultTitle = "My Photo Coloring"
         )
     )
 

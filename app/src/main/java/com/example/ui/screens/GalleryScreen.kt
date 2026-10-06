@@ -1,7 +1,9 @@
 package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
@@ -32,6 +35,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,12 +54,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.DrawingEntity
+import com.example.model.DrawingCanvasData
 import com.example.model.TemplateRegistry
+import com.example.util.PhotoLineArtConverter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -68,6 +76,7 @@ fun GalleryScreen(
     onDeleteDrawing: (Long) -> Unit,
     onToggleFavorite: (DrawingEntity) -> Unit,
     onStartNewDrawing: () -> Unit,
+    onOpenPhotoToArt: () -> Unit = {},
     onBack: () -> Unit
 ) {
     BackHandler { onBack() }
@@ -100,6 +109,22 @@ fun GalleryScreen(
                 }
             },
             actions = {
+                FilledTonalButton(
+                    onClick = onOpenPhotoToArt,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .padding(end = 4.dp)
+                        .testTag("gallery_photo_to_art_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CameraAlt,
+                        contentDescription = "Photo to Art",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Photo 📸", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+
                 Button(
                     onClick = onStartNewDrawing,
                     shape = RoundedCornerShape(14.dp),
@@ -259,10 +284,30 @@ private fun DrawingCardItem(
                     .fillMaxWidth()
                     .height(120.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .background(Color.White)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = template.emoji, fontSize = 54.sp)
+                val canvasData = remember(drawing.strokesJson) {
+                    DrawingCanvasData.fromJson(drawing.strokesJson)
+                }
+                val photoBmp = remember(canvasData.photoLineArtBase64) {
+                    canvasData.photoLineArtBase64?.let { PhotoLineArtConverter.base64ToBitmap(it) }
+                }
+
+                if (photoBmp != null) {
+                    Image(
+                        bitmap = photoBmp.asImageBitmap(),
+                        contentDescription = drawing.title,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(6.dp)
+                            .clip(RoundedCornerShape(10.dp)),
+                        contentScale = ContentScale.Fit
+                    )
+                } else {
+                    Text(text = template.emoji, fontSize = 54.sp)
+                }
 
                 // Favorite button top right
                 IconButton(
